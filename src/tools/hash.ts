@@ -1,4 +1,5 @@
 import { assertInputSize } from '@/lib/limits'
+import { bytesToBase64, utf8Encode } from '@/lib/base64'
 
 export type HashAlgorithm = 'SHA-1' | 'SHA-256' | 'SHA-384' | 'SHA-512'
 
@@ -14,14 +15,14 @@ export type HashResult = {
 /** Digests text (UTF-8) with WebCrypto. SHA-1 is kept for parity, flagged legacy in the UI. */
 export async function hashText(text: string, algorithm: HashAlgorithm): Promise<HashResult> {
   assertInputSize(text, 'text to hash')
-  const data = new TextEncoder().encode(text)
+  const data = utf8Encode(text)
   const digest = await crypto.subtle.digest(algorithm, data as unknown as ArrayBuffer)
   return { algorithm, hex: toHex(digest), base64: bytesToBase64(new Uint8Array(digest)), bytes: data.length }
 }
 
 /** CRC-32 (IEEE 802.3), the one checksum WebCrypto does not provide. */
 export function crc32(text: string): string {
-  const bytes = new TextEncoder().encode(text)
+  const bytes = utf8Encode(text)
   let crc = 0xffffffff
   for (let i = 0; i < bytes.length; i++) {
     crc ^= bytes[i]!
@@ -37,13 +38,4 @@ export function toHex(buffer: ArrayBuffer): string {
   let out = ''
   for (let i = 0; i < bytes.length; i++) out += bytes[i]!.toString(16).padStart(2, '0')
   return out
-}
-
-function bytesToBase64(bytes: Uint8Array): string {
-  let binary = ''
-  const CHUNK = 0x8000
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
-  }
-  return btoa(binary)
 }

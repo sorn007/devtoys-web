@@ -38,6 +38,13 @@ describe('formatJson', () => {
     expect(r.ok).toBe(true)
     expect(JSON.parse(r.output).emoji).toBe('🙂')
   })
+
+  it('preserves Thai and emoji strings through format and minify', () => {
+    const r = formatJson('{"name":"สมชาย","e":"😀"}')
+    expect(r.ok).toBe(true)
+    expect(JSON.parse(r.output).name).toBe('สมชาย')
+    expect(JSON.parse(minifyJson(r.output).output).e).toBe('😀')
+  })
 })
 
 describe('minifyJson', () => {

@@ -98,6 +98,16 @@ describe('XSS payload corpus (layers 1–3: pre-escape + URL/image policy)', () 
     expect(r.ok && r.html).toContain('href="mailto:a@b.c"')
   })
 
+  it('renders Thai and emoji text without mangling it', async () => {
+    const r = await renderMarkdown('# สวัสดี 😀\n\nสมชาย says hi 🙂')
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      expect(r.html).toContain('สวัสดี 😀')
+      expect(r.html).toContain('สมชาย says hi 🙂')
+      expect(r.html).not.toContain('�')
+    }
+  })
+
   it('renders ordinary Markdown correctly (headings, GFM tables, code)', async () => {
     const r = await renderMarkdown('# Title\n\n| a | b |\n| - | - |\n| 1 | 2 |\n\n`code`')
     expect(r.ok).toBe(true)

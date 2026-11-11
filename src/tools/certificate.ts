@@ -11,6 +11,8 @@
  * as truncated), and computes SHA-1/SHA-256 fingerprints with WebCrypto.
  */
 
+import { base64ToBytes, utf8Decode } from '@/lib/base64'
+
 export const CERT_MAX_INPUT_CHARS = 200_000
 
 export type CertField = { key: string; value: string }
@@ -262,19 +264,52 @@ function readName(tlv: { tag: number; content: Uint8Array }): CertField[] {
       const oid = readOid(ar.tlv().content)
       const valueTlv = ar.tlv()
       const label = NAME_OIDS[oid] ?? oid
-      fields.push({ key: label, value: decodeAsString(valueTlv.content) })
+      fields.push({ key: label, value: decodeAsString(valueTlv.tag, valueTlv.content) })
     }
   }
   return fields
 }
 
-function decodeAsString(bytes: Uint8Array): string {
-  // PrintableString/UTF8String/IA5String/T61String all decode as text here.
-  return new TextDecoder('utf-8', { fatal: false }).decode(bytes)
+/**
+ * Decodes an ASN.1 string value by its tag. The byte-string types
+ * (PrintableString, IA5String, NumericString, T61String…) are ASCII in
+ * practice and decode fine as UTF-8; BMPString and UniversalString are
+ * UCS-2/UTF-32 big-endian and MUST NOT be read as UTF-8 or every non-ASCII
+ * character turns into mojibake.
+ */
+export function decodeAsString(tag: number, bytes: Uint8Array): string {
+  switch (tag) {
+    case 0x1e: // BMPString: UCS-2, big-endian
+      return decodeUtf16be(bytes)
+    case 0x1c: // UniversalString: UCS-4, big-endian
+      return decodeUtf32be(bytes)
+    default:
+      // 0x0c UTF8String, 0x12 NumericString, 0x13 PrintableString,
+      // 0x14 T61String, 0x16 IA5String, and context tags (SAN) — byte strings.
+      return utf8Decode(bytes)
+  }
+}
+
+function decodeUtf16be(bytes: Uint8Array): string {
+  let out = ''
+  for (let i = 0; i + 1 < bytes.length; i += 2) {
+    out += String.fromCharCode((bytes[i]! << 8) | bytes[i + 1]!)
+  }
+  // An odd trailing byte is malformed; ignore it rather than guessing.
+  return out
+}
+
+function decodeUtf32be(bytes: Uint8Array): string {
+  let out = ''
+  for (let i = 0; i + 3 < bytes.length; i += 4) {
+    const cp = ((bytes[i]! << 24) | (bytes[i + 1]! << 16) | (bytes[i + 2]! << 8) | bytes[i + 3]!) >>> 0
+    out += cp <= 0x10ffff && !(cp >= 0xd800 && cp <= 0xdfff) ? String.fromCodePoint(cp) : '�'
+  }
+  return out
 }
 
 function readTime(tlv: { tag: number; content: Uint8Array }): string {
-  const raw = decodeAsString(tlv.content)
+  const raw = decodeAsString(tlv.tag, tlv.content)
   // UTCTime YYMMDDHHMMSSZ / GeneralizedTime YYYYMMDDHHMMSSZ → ISO-ish.
   const m = /^(\d{2}|\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?Z?$/.exec(raw)
   if (!m) return raw
@@ -309,7 +344,7 @@ function readSan(value: Uint8Array): string[] {
     const r = new Reader(seq.content)
     while (r.pos < seq.content.length) {
       const g = r.tlv()
-      const text = decodeAsString(g.content)
+      const text = decodeAsString(g.tag, g.content)
       if (g.tag === 0x82) out.push(`DNS:${text}`)
       else if (g.tag === 0x81) out.push(`email:${text}`)
       else if (g.tag === 0x86) out.push(`URI:${text}`)
@@ -368,14 +403,6 @@ function readBasicConstraints(value: Uint8Array): boolean | null {
 }
 
 /* --- input decoding ------------------------------------------------------- */
-
-function base64ToBytes(input: string): Uint8Array {
-  const normalized = input.replaceAll('-', '+').replaceAll('_', '/').replace(/=+$/g, '')
-  const binary = atob(normalized + '='.repeat((4 - (normalized.length % 4)) % 4))
-  const out = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
-  return out
-}
 
 function hexToBytes(hex: string): Uint8Array {
   const out = new Uint8Array(hex.length / 2)

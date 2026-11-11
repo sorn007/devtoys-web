@@ -5,6 +5,7 @@
  */
 
 import { IMAGE_MAX_DIMENSION, IMAGE_MAX_PIXELS } from '@/lib/limits'
+import { base64ToBytes, bytesToBase64 } from '@/lib/base64'
 
 export type ImageFacts = {
   mime: string
@@ -31,10 +32,7 @@ export function parseDataUrl(input: string): DataUrlParse {
   const [, mime, payloadRaw] = match
   const payload = payloadRaw!.replace(/\s+/g, '')
   try {
-    const binary = atob(payload)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-    return { ok: true, mime: mime!, bytes }
+    return { ok: true, mime: mime!, bytes: base64ToBytes(payload) }
   } catch {
     return { ok: false, error: 'The base64 payload is not valid base64.' }
   }
@@ -69,12 +67,7 @@ export function probeImage(url: string): Promise<{ width: number; height: number
 }
 
 export function bytesToDataUrl(bytes: Uint8Array, mime: string): string {
-  let binary = ''
-  const CHUNK = 0x8000
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
-  }
-  return `data:${mime};base64,${btoa(binary)}`
+  return `data:${mime};base64,${bytesToBase64(bytes)}`
 }
 
 export function describeImage(mime: string, bytes: Uint8Array, width: number, height: number): ImageFacts {

@@ -20,6 +20,15 @@ describe('yamlToJson', () => {
     if (back.ok) expect(JSON.parse(back.output)).toEqual(JSON.parse(json))
   })
 
+  it('round-trips Thai and emoji values untouched', async () => {
+    const json = '{"name":"สมชาย","e":"😀"}'
+    const toYaml = await jsonToYaml(json)
+    expect(toYaml.ok).toBe(true)
+    const back = await yamlToJson(toYaml.ok ? toYaml.output : '')
+    expect(back.ok).toBe(true)
+    if (back.ok) expect(JSON.parse(back.output)).toEqual({ name: 'สมชาย', e: '😀' })
+  })
+
   it('reports syntax errors instead of throwing', async () => {
     const r = await yamlToJson('a: [unclosed')
     expect(r.ok).toBe(false)

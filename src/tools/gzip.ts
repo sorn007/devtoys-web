@@ -54,8 +54,11 @@ export async function gzipDecompress(
   const stream = new DecompressionStream('gzip')
   const reader = stream.readable.getReader()
   const writer = stream.writable.getWriter()
-  void writer.write(data as unknown as BufferSource)
-  void writer.close()
+  // Errors surface through the reader below; the write-side promises reject
+  // when the stream is aborted (bomb guard) or fed corrupt input, and must not
+  // become unhandled rejections.
+  writer.write(data as unknown as BufferSource).catch(() => {})
+  writer.close().catch(() => {})
 
   const chunks: Uint8Array[] = []
   let total = 0
@@ -76,8 +79,8 @@ export async function gzipDecompress(
 
 async function streamThrough(stream: CompressionStream, data: Uint8Array): Promise<Uint8Array> {
   const writer = stream.writable.getWriter()
-  void writer.write(data as unknown as BufferSource)
-  void writer.close()
+  writer.write(data as unknown as BufferSource).catch(() => {})
+  writer.close().catch(() => {})
   const reader = stream.readable.getReader()
   const chunks: Uint8Array[] = []
   let total = 0

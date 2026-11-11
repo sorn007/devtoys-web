@@ -4,6 +4,8 @@
  * The UI labels every output "NOT VERIFIED".
  */
 
+import { base64ToBytes, utf8Decode } from '@/lib/base64'
+
 export type JwtClaims = Record<string, unknown>
 
 export type DecodedJwt = {
@@ -42,16 +44,19 @@ function decodeSegment(segment: string, what: string): JwtClaims {
   if (!/^[A-Za-z0-9+/]*$/.test(normalized)) {
     throw new Error(`The ${what} segment contains characters that are not valid base64url.`)
   }
-  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
-  let binary: string
+  let bytes: Uint8Array
   try {
-    binary = atob(padded)
+    bytes = base64ToBytes(segment)
   } catch {
     throw new Error(`The ${what} segment is not valid base64url.`)
   }
+  // Segments are UTF-8 JSON. atob() alone would hand us a Latin-1 binary
+  // string and mojibake every multi-byte claim, so decode the bytes as UTF-8
+  // first (invalid sequences become U+FFFD) and parse the resulting text.
+  const text = utf8Decode(bytes)
   let parsed: unknown
   try {
-    parsed = JSON.parse(binary)
+    parsed = JSON.parse(text)
   } catch {
     throw new Error(`The ${what} segment does not contain JSON.`)
   }
@@ -78,10 +83,4 @@ export function claimViews(claims: JwtClaims, nowMs = Date.now()): ClaimView[] {
     }
     return { key, raw, human: null, state: '' }
   })
-}
-
-export { base64UrlDecodeToString }
-function base64UrlDecodeToString(segment: string): string {
-  const normalized = segment.replaceAll('-', '+').replaceAll('_', '/')
-  return atob(normalized + '='.repeat((4 - (normalized.length % 4)) % 4))
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { describeCron, nextRuns, parseCron, CRON_MAX_SEARCH_STEPS } from '@/tools/cron'
 import { claimViews, decodeJwt } from '@/tools/jwt'
 import { runJsonPath } from '@/tools/jsonpath'
+import { bytesToBase64, utf8Encode } from '@/lib/base64'
 
 const STORE = JSON.stringify({
   store: {
@@ -134,6 +135,42 @@ describe('jwt decode (never verifies)', () => {
   it('contains no verification logic — decoding a tampered token still succeeds', () => {
     const d = decodeJwt(`${header}.${payload}.tampered`)
     expect(d.payload.sub).toBe('12345') // decode-only: we assert we did NOT "fail" it
+  })
+})
+
+describe('jwt decode (UTF-8 payload)', () => {
+  // Tokens are built with the shared UTF-8 → base64url pipeline: btoa() on a
+  // JSON.stringify of non-ASCII text would only ever produce mojibake.
+  const segment = (claims: Record<string, unknown>) => bytesToBase64(utf8Encode(JSON.stringify(claims)), true)
+  const header = segment({ alg: 'HS256', typ: 'JWT' })
+  const payload = segment({ name: 'สมชาย', e: '😀' })
+
+  it('decodes Thai and emoji claims as real strings, not mojibake', () => {
+    const d = decodeJwt(`${header}.${payload}.sig-not-checked`)
+    expect(d.payload.name).toBe('สมชาย')
+    expect(d.payload.e).toBe('😀')
+    expect(d.payload.name).not.toContain('�') // and not 'à¸ª…' Latin-1 junk
+  })
+
+  it('shows Thai and emoji in claimViews raw strings', () => {
+    const rows = claimViews(decodeJwt(`${header}.${payload}`).payload)
+    expect(rows.find((r) => r.key === 'name')!.raw).toBe('สมชาย')
+    expect(rows.find((r) => r.key === 'e')!.raw).toBe('😀')
+  })
+
+  it('keeps Thai inside nested claim objects intact', () => {
+    const nested = segment({ user: { name: 'สมชาย', mood: '😀' } })
+    const rows = claimViews(decodeJwt(`${header}.${nested}.x`).payload)
+    const raw = rows.find((r) => r.key === 'user')!.raw
+    expect(raw).toContain('สมชาย')
+    expect(raw).toContain('😀')
+  })
+
+  it('still rejects invalid segments and non-JSON payloads with the same errors', () => {
+    expect(() => decodeJwt(`${header}.!!!.?`)).toThrow(/base64url/)
+    // Valid base64url of bytes that are not JSON (raw 0xff 0xfe).
+    expect(() => decodeJwt(`${header}.__8.`)).toThrow(/does not contain JSON/)
+    expect(() => decodeJwt(`${header}.WyJhcnJheSJd.x`)).toThrow(/not a JSON object/)
   })
 })
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { bytesToHexColon, parseCertificate, type CertificateInfo } from '@/tools/certificate'
+import { base64ToBytes } from '@/lib/base64'
 import { copyText } from '@/lib/clipboard'
 
 const input = ref('')
@@ -18,14 +19,14 @@ async function decode(): Promise<void> {
   let der: Uint8Array | null = null
   if (blocks.length > 0) {
     const body = blocks[0]![1]!.replace(/\s+/g, '')
-    der = base64(body)
+    der = base64ToBytes(body)
   } else if (/^[0-9a-f]+$/i.test(text.replace(/\s+/g, '')) && text.replace(/\s+/g, '').length % 2 === 0) {
     const hex = text.replace(/\s+/g, '')
     der = new Uint8Array(hex.length / 2)
     for (let i = 0; i < der.length; i++) der[i] = Number.parseInt(hex.slice(i * 2, i * 2 + 2), 16)
   } else {
     try {
-      der = base64(text.replace(/\s+/g, ''))
+      der = base64ToBytes(text.replace(/\s+/g, ''))
     } catch {
       der = null
     }
@@ -39,14 +40,6 @@ async function decode(): Promise<void> {
   const result = parseCertificate(text, sha1, sha256)
   if (result.ok) info.value = result.info
   else error.value = result.error
-}
-
-function base64(clean: string): Uint8Array {
-  const normalized = clean.replaceAll('-', '+').replaceAll('_', '/').replace(/=+$/g, '')
-  const binary = atob(normalized + '='.repeat((4 - (normalized.length % 4)) % 4))
-  const out = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i)
-  return out
 }
 
 async function copy(text: string): Promise<void> {

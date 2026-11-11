@@ -38,6 +38,13 @@ describe('gzip round-trip', () => {
   it('rejects corrupt gzip data with a real error', async () => {
     await expect(gzipDecompress(new Uint8Array([1, 2, 3, 4, 5]))).rejects.toThrow()
   })
+
+  it('round-trips Thai and emoji through UTF-8 bytes', async () => {
+    const text = 'สวัสดี สมชาย 😀 — héllo'
+    const data = new TextEncoder().encode(text)
+    const restored = await gzipDecompress(await gzipCompress(data))
+    expect(new TextDecoder('utf-8').decode(restored)).toBe(text)
+  })
 })
 
 describe('data URL parsing', () => {
@@ -77,6 +84,16 @@ describe('HTML entities', () => {
 
   it('encodes non-ASCII as numeric references when asked, including astral characters', () => {
     expect(encodeHtml('café 🙂', true)).toBe('caf&#233; &#128578;')
+  })
+
+  it('round-trips Thai and emoji through numeric references', () => {
+    const raw = 'สวัสดี 😀'
+    // Thai code points U+0E2A U+0E27 U+0E31 U+0E2A U+0E14 U+0E35 (decimal
+    // 3626 3623 3633 3626 3604 3637); emoji U+1F600 (decimal 128512).
+    expect(encodeHtml(raw, true)).toBe('&#3626;&#3623;&#3633;&#3626;&#3604;&#3637; &#128512;')
+    expect(decodeHtml(encodeHtml(raw, true))).toBe(raw)
+    // Left unescaped, Thai and emoji pass through untouched (UTF-16 string).
+    expect(encodeHtml(raw)).toBe(raw)
   })
 
   it('decodes named entities and both numeric forms', () => {

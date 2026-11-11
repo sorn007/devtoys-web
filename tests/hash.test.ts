@@ -35,6 +35,12 @@ describe('hashText', () => {
     // Verified against `openssl dgst -binary -sha256 | base64` for "abc".
     expect(r.base64).toBe('ungWv48Bz+pBQUDeXa4iI7ADYaOWF3qctBD/YfIAFa0=')
   })
+
+  it('hashes Thai text as UTF-8 bytes (verified against node:crypto)', async () => {
+    const r = await hashText('สวัสดี', 'SHA-256')
+    expect(r.hex).toBe('4ad434bd60c467ad71c61029edf3a84f65dc5ec5742aa0c0dc2afaa1e226198a')
+    expect(r.bytes).toBe(18) // 6 code points × 3 UTF-8 bytes
+  })
 })
 
 describe('crc32', () => {
@@ -43,6 +49,11 @@ describe('crc32', () => {
     expect(crc32('a')).toBe('e8b7be43')
     expect(crc32('123456789')).toBe('cbf43926')
     expect(crc32('The quick brown fox jumps over the lazy dog')).toBe('414fa339')
+  })
+
+  it('checksums UTF-8 bytes of Thai and emoji (verified against node:zlib)', () => {
+    expect(crc32('สวัสดี')).toBe('a7b5ab0d')
+    expect(crc32('😀')).toBe('054db544')
   })
 })
 

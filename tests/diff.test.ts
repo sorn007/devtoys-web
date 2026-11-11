@@ -45,6 +45,13 @@ describe('diffLines', () => {
     expect(r.rows[2]).toMatchObject({ op: 'added', text: 'c', leftNo: null, rightNo: 2 })
   })
 
+  it('does not mangle Thai or emoji lines', () => {
+    const r = diffLines('สวัสดี\nsame', 'สวัสดีครับ 😀\nsame')
+    expect(ops(r)).toEqual(['removed', 'added', 'equal'])
+    expect(r.rows[0]).toMatchObject({ op: 'removed', text: 'สวัสดี' })
+    expect(r.rows[1]).toMatchObject({ op: 'added', text: 'สวัสดีครับ 😀' })
+  })
+
   it('handles empty sides', () => {
     const r = diffLines('', 'x\ny')
     expect(r.mode).toBe('exact')

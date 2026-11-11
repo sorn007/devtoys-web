@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseCertificate } from '@/tools/certificate'
+import { decodeAsString, parseCertificate } from '@/tools/certificate'
 
 // Real certificate generated with openssl for this test suite (openssl req -x509,
 // RSA-2048, subject /C=DE/ST=Berlin/L=Berlin/O=Toolbox Test/CN=toolbox.test,
@@ -91,5 +91,115 @@ describe('certificate decoder rejects malformed input', () => {
     const r = parseCertificate(PEM + PEM, SHA1, SHA256)
     expect(r.ok).toBe(true)
     if (r.ok) expect(r.info.pemBlocksFound).toBe(2)
+  })
+})
+
+/* --- minimal DER builder for DirectoryString tag coverage ------------------ */
+
+function derBytes(...parts: Uint8Array[]): Uint8Array {
+  const total = parts.reduce((n, p) => n + p.length, 0)
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const p of parts) {
+    out.set(p, offset)
+    offset += p.length
+  }
+  return out
+}
+
+function tlv(tag: number, content: Uint8Array): Uint8Array {
+  const len =
+    content.length < 0x80
+      ? [content.length]
+      : content.length <= 0xff
+        ? [0x81, content.length]
+        : [0x82, content.length >> 8, content.length & 0xff]
+  return Uint8Array.from([tag, ...len, ...content])
+}
+
+const seq = (...parts: Uint8Array[]) => tlv(0x30, derBytes(...parts))
+const setOf = (...parts: Uint8Array[]) => tlv(0x31, derBytes(...parts))
+const oidTlv = (bytes: number[]) => tlv(0x06, Uint8Array.from(bytes))
+const intOne = () => tlv(0x02, Uint8Array.of(1))
+const utf8Str = (s: string) => tlv(0x0c, new TextEncoder().encode(s)) // UTF8String
+const printable = (s: string) => tlv(0x13, new TextEncoder().encode(s)) // PrintableString
+const bmpStr = (s: string) => tlv(0x1e, utf16be(s)) // BMPString: UCS-2 big-endian
+const universalStr = (s: string) => tlv(0x1c, utf32be(s)) // UniversalString: UCS-4 big-endian
+
+function utf16be(s: string): Uint8Array {
+  const out = new Uint8Array(s.length * 2)
+  for (let i = 0; i < s.length; i++) {
+    out[i * 2] = s.charCodeAt(i) >> 8
+    out[i * 2 + 1] = s.charCodeAt(i) & 0xff
+  }
+  return out
+}
+
+function utf32be(s: string): Uint8Array {
+  const out = new Uint8Array([...s].length * 4)
+  let i = 0
+  for (const ch of s) {
+    const cp = ch.codePointAt(0)!
+    out[i]! = cp >>> 24
+    out[i + 1]! = (cp >>> 16) & 0xff
+    out[i + 2]! = (cp >>> 8) & 0xff
+    out[i + 3]! = cp & 0xff
+    i += 4
+  }
+  return out
+}
+
+const rdn = (oidBytes: number[], value: Uint8Array) => setOf(seq(oidTlv(oidBytes), value))
+const rdnName = (...rdns: Uint8Array[]) => seq(...rdns)
+const utcTime = (s: string) => tlv(0x17, new TextEncoder().encode(s))
+const bitString = (bytes: number[]) => tlv(0x03, Uint8Array.from([0, ...bytes])) // 0 unused bits
+const octetString = (bytes: number[]) => tlv(0x04, Uint8Array.from(bytes))
+
+/** One unknown extension (OID 1.2.3): parsed and then ignored by the decoder. */
+const extensions = () => tlv(0xa3, seq(seq(oidTlv([0x2a, 0x03]), octetString([0x00]))))
+
+const OID_SHA256_RSA = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x0b] // 1.2.840.113549.1.1.11
+const OID_RSA_ENC = [0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01] // 1.2.840.113549.1.1.1
+const OID_CN = [0x55, 0x04, 0x03]
+const OID_O = [0x55, 0x04, 0x0a]
+
+/** Builds a minimal (structurally valid) certificate DER as hex. */
+function buildCertHex(subject: Uint8Array, issuer: Uint8Array): string {
+  const tbs = seq(
+    intOne(),
+    seq(oidTlv(OID_SHA256_RSA)),
+    issuer,
+    seq(utcTime('260101000000Z'), utcTime('300101000000Z')),
+    subject,
+    seq(seq(oidTlv(OID_RSA_ENC)), bitString([0x30, 0x03, 0x02, 0x01, 0x05])),
+    extensions(), // the decoder always reads one more TLV after the SPKI
+  )
+  const cert = seq(tbs, seq(oidTlv(OID_SHA256_RSA)), bitString([0x00]))
+  return [...cert].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+describe('certificate DirectoryString tags (UTF-8 / BMP / Universal)', () => {
+  it('decodeAsString branches on the ASN.1 tag instead of assuming UTF-8', () => {
+    expect(decodeAsString(0x0c, new TextEncoder().encode('สมชาย 😀'))).toBe('สมชาย 😀')
+    expect(decodeAsString(0x1e, utf16be('สมชาย'))).toBe('สมชาย') // BMPString, NOT utf-8 mojibake
+    // universalStr emits tag + short-form length + content, so content is .subarray(2).
+    expect(decodeAsString(0x1c, universalStr('สมชาย 😀').subarray(2))).toBe('สมชาย 😀')
+    expect(decodeAsString(0x13, new TextEncoder().encode('Toolbox Test'))).toBe('Toolbox Test')
+  })
+
+  it('displays a BMPString CN and a UTF8String O (Thai + emoji) correctly', () => {
+    const derHex = buildCertHex(
+      rdnName(rdn(OID_CN, bmpStr('สมชาย')), rdn(OID_O, utf8Str('องค์กร 😀'))),
+      rdnName(rdn(OID_CN, printable('Test CA'))),
+    )
+    const r = parseCertificate(derHex, '', '')
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    const subject = Object.fromEntries(r.info.subject.map((f) => [f.key, f.value]))
+    expect(subject.CN).toBe('สมชาย') // previously rendered as 'à¸ª…' Latin-1 junk
+    expect(subject.CN).not.toContain('�')
+    expect(subject.O).toBe('องค์กร 😀')
+    expect(r.info.issuer[0]!.value).toBe('Test CA')
+    expect(r.info.notBefore).toBe('2026-01-01T00:00:00Z')
   })
 })

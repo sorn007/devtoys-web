@@ -57,6 +57,12 @@ describe('MD5 (legacy, labelled)', () => {
   it('handles multi-byte UTF-8 input (verified against Python hashlib)', () => {
     expect(md5('héllo 🙂')).toBe('4350c339182b99fe2e03229429062155')
   })
+
+  it('hashes Thai text as UTF-8 bytes (verified against node:crypto)', () => {
+    // node -e "require('crypto').createHash('md5').update('สวัสดี','utf8').digest('hex')"
+    expect(md5('สวัสดี')).toBe('93e2ea9d56d97ea1ef50beb5c0939014')
+    expect(md5('สวัสดี😀')).toBe('0327293e71c541bf8a9097c7e9ebe046')
+  })
 })
 
 describe('diff options', () => {

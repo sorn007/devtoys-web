@@ -97,6 +97,12 @@ describe('QR round-trip (real, in Node)', () => {
     expect(await decodeQrPixels(pixels.data, pixels.width, pixels.height)).toBe(text)
   })
 
+  it('round-trips Thai and emoji text', async () => {
+    const text = 'สวัสดี QR 😀'
+    const pixels = renderQrToPixels(await createQrMatrix(text, 'M'), { scale: 8 })
+    expect(await decodeQrPixels(pixels.data, pixels.width, pixels.height)).toBe(text)
+  })
+
   it('returns null for a blank image instead of pretending', async () => {
     const blank = renderQrToPixels(await createQrMatrix('x', 'M'), { scale: 8 })
     // Overwrite everything to white: no QR remains.

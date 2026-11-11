@@ -30,6 +30,19 @@ describe('analyzeText', () => {
     expect(analyzeText('🙂').characters).toBe(1)
   })
 
+  it('measures Thai text: 18 UTF-8 bytes, 6 code points, 4 graphemes', () => {
+    const s = analyzeText('สวัสดี')
+    expect(s.bytes).toBe(18) // 6 code points × 3 bytes each
+    expect(s.codePoints).toBe(6)
+    expect(s.characters).toBe(6)
+    // ส วั ส ดี — the combining marks merge into their base consonants.
+    if ('Segmenter' in Intl) expect(s.graphemes).toBe(4)
+    const emoji = analyzeText('😀')
+    expect(emoji.bytes).toBe(4)
+    expect(emoji.codePoints).toBe(1)
+    if ('Segmenter' in Intl) expect(emoji.graphemes).toBe(1)
+  })
+
   it('counts graphemes, not code points, when Segmenter is available', () => {
     // family emoji: 7 code points, 1 grapheme
     const family = '👨‍👩‍👧‍👦'
@@ -119,6 +132,13 @@ describe('escape / unescape', () => {
     const escaped = escapeText('héllo 🙂', 'json', true)
     expect(escaped).toBe('h\\u00e9llo \\ud83d\\ude42')
     expect(unescapeText(escaped, 'json')).toBe('héllo 🙂')
+  })
+
+  it('round-trips Thai and emoji through \\u escaping, astral as surrogate pairs', () => {
+    const raw = 'สวัสดี 😀'
+    const escaped = escapeText(raw, 'json', true)
+    expect(escaped).toBe('\\u0e2a\\u0e27\\u0e31\\u0e2a\\u0e14\\u0e35 \\ud83d\\ude00')
+    expect(unescapeText(escaped, 'json')).toBe(raw)
   })
 
   it('decodes escaped markup into inert text, never into code', () => {

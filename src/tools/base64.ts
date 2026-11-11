@@ -1,17 +1,10 @@
 import { assertInputSize } from '@/lib/limits'
+import { base64ToBytes, bytesToBase64, utf8Decode, utf8Encode } from '@/lib/base64'
 
 /** Encodes text as UTF-8 then Base64 (standard alphabet, with padding). */
 export function base64Encode(text: string, urlSafe = false): string {
   assertInputSize(text, 'text to encode')
-  const bytes = new TextEncoder().encode(text)
-  let binary = ''
-  // Chunked to stay under the ~512 MiB String.fromCharCode arg limit.
-  const CHUNK = 0x8000
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK))
-  }
-  const b64 = btoa(binary)
-  return urlSafe ? b64.replaceAll('+', '-').replaceAll('/', '_').replaceAll(/=+$/g, '') : b64
+  return bytesToBase64(utf8Encode(text), urlSafe)
 }
 
 /**
@@ -20,17 +13,8 @@ export function base64Encode(text: string, urlSafe = false): string {
  */
 export function base64Decode(input: string): string {
   assertInputSize(input, 'Base64 to decode')
-  const normalized = input.trim().replaceAll('-', '+').replaceAll('_', '/').replace(/=+$/g, '')
-  if (normalized.length === 0) return ''
-  if (!/^[A-Za-z0-9+/]*$/.test(normalized)) {
-    throw new TypeError('Input contains characters that are not valid Base64.')
-  }
-  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
-  const binary = atob(padded)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
   // Replaces lone surrogates instead of throwing, so byte-level junk still decodes.
-  return new TextDecoder('utf-8', { fatal: false }).decode(bytes)
+  return utf8Decode(base64ToBytes(input))
 }
 
 export function isProbablyBase64(input: string): boolean {

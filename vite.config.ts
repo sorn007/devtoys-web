@@ -79,11 +79,6 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url)),
     },
   },
-  // Vitest: Playwright e2e specs are NOT unit tests (they need a browser and a
-  // built app); exclude them so `npm run test` stays a pure unit run.
-  test: {
-    exclude: ['node_modules/**', 'dist/**', 'e2e/**', 'test-results/**', 'playwright-report/**'],
-  },
   worker: {
     format: 'es',
     rollupOptions: {

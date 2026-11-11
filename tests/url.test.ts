@@ -13,6 +13,13 @@ describe('urlEncode', () => {
   it('encodes non-ASCII as UTF-8 percent escapes', () => {
     expect(urlEncode('é')).toBe('%C3%A9')
   })
+
+  it('encodes Thai and emoji as their exact UTF-8 percent escapes', () => {
+    expect(urlEncode('สวัสดี')).toBe('%E0%B8%AA%E0%B8%A7%E0%B8%B1%E0%B8%AA%E0%B8%94%E0%B8%B5')
+    expect(urlEncode('😀')).toBe('%F0%9F%98%80')
+    expect(urlDecode('%E0%B8%AA%E0%B8%A7%E0%B8%B1%E0%B8%AA%E0%B8%94%E0%B8%B5%20%F0%9F%98%80')).toBe('สวัสดี 😀')
+    expect(urlDecode(urlEncode('สวัสดี 😀 ?=&#'))).toBe('สวัสดี 😀 ?=&#')
+  })
 })
 
 describe('urlDecode', () => {
