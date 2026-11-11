@@ -3,6 +3,8 @@ import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 import { route, goHome } from '@/router'
 import { findTool } from '@/tools/registry'
 import { applyTheme, currentTheme, toggleTheme, type Theme } from '@/lib/theme'
+import ToolMenu from '@/components/ToolMenu.vue'
+import { prefs } from '@/lib/prefs'
 
 const HomeView = defineAsyncComponent(() => import('@/views/HomeView.vue'))
 
@@ -43,10 +45,15 @@ const activeTool = computed(() => (route.value.name === 'tool' ? findTool(route.
 const unknownTool = computed(() => route.value.name === 'tool' && !findTool(route.value.id))
 
 watch(
-  () => route.value.name,
-  (name) => {
-    if (name === 'home') document.title = 'Toolbox — offline developer utilities'
+  () => route.value,
+  (current) => {
+    if (current.name === 'home') document.title = 'Toolbox — offline developer utilities'
     else if (activeTool.value) document.title = `${activeTool.value.name} — Toolbox`
+    if (current.name === 'tool' && activeTool.value) {
+      const recent = prefs.getString('recentTools', prefs.getString('recentTool')).split(',')
+      prefs.setString('recentTool', current.id)
+      prefs.setString('recentTools', [current.id, ...recent.filter(id => id && id !== current.id)].slice(0, 4).join(','))
+    }
     // Move focus off the previous tool's controls so keyboard users land somewhere predictable.
     window.scrollTo({ top: 0 })
   },
@@ -58,6 +65,7 @@ watch(
 
   <div class="app">
     <header class="topbar">
+      <ToolMenu />
       <button class="brand" type="button" @click="goHome()" aria-label="Toolbox home">
         <svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true">
           <path d="M4 7h16M4 12h10M4 17h7" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none" />

@@ -1,0 +1,22 @@
+# Keep the build context small (and never leak local artifacts into the image).
+node_modules
+dist
+.git
+.claude
+logs
+data
+test-results
+playwright-report
+e2e
+
+# Local env / editor / docker files — not needed inside the build.
+.env
+.env.*
+.vscode
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Docs don't affect the build output.
+*.md
+LICENSE*
