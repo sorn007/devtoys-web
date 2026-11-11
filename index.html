@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark light" />
+    <!-- Narrow CSP: 'wasm-unsafe-eval' is required ONLY for the XSD validator's
+         libxml2 wasm; never a blanket unsafe-eval. No remote origins allowed. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; frame-src 'self' data: about:; object-src 'none'; base-uri 'self'" />
+    <meta name="theme-color" content="#0b0f17" />
+    <meta name="description" content="Offline, local-only developer utilities: JSON, Base64, URL, UUID, hash, diff, regex. Nothing leaves your browser." />
+    <title>Toolbox — offline developer utilities</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <script src="/theme-init.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
