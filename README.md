@@ -1,12 +1,33 @@
 # Toolbox — an offline, low-RAM developer-utilities web app
 
-An **original** Vue 3 + TypeScript + Vite SPA/PWA inspired by
-[DevToys](https://github.com/DevToys-app/DevToys). It is **not** DevToys, carries no DevToys
-branding, logos or assets, and is not affiliated with or endorsed by the DevToys project.
+Crafted with Vue 3, TypeScript, and Vite, Toolbox brings the developer-utility
+experience of [DevToys](https://github.com/DevToys-app/DevToys) to an offline-first
+web app (SPA/PWA). DevToys inspired the tool selection, categories, and navigation;
+this project is an independent implementation maintained separately from the
+DevToys project.
 
 Everything runs locally in your browser. No analytics, no telemetry, and no network calls after
 the app shell (plus the disclosed optional heavy chunks below) have loaded — see
 [Privacy](#privacy).
+
+## Inspiration and attribution
+
+Toolbox was crafted as an independent web implementation inspired by
+[DevToys-app/DevToys](https://github.com/DevToys-app/DevToys), the original
+developer toolbox that informed this project's tool selection, categories,
+and navigation experience. Thanks to the DevToys authors and contributors
+for the inspiration.
+
+This repository is not an official DevToys release and is not affiliated with
+or endorsed by the DevToys project. The original project's license is available
+in [DevToys LICENSE.md](https://github.com/DevToys-app/DevToys/blob/main/LICENSE.md).
+
+## License
+
+This project's original code is licensed under the [MIT License](LICENSE).
+Third-party dependencies and bundled components retain their respective
+licenses; see [dependency licenses](#licenses-runtime-dependencies-exact-pinned-versions)
+and the notices distributed with those components.
 
 ## Quick start
 

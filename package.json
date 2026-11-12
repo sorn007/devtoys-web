@@ -2,6 +2,7 @@
   "name": "devtoys-web",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "description": "An original, low-RAM DevToys-inspired offline toolbox for the web. Not affiliated with the DevToys project.",
   "scripts": {
